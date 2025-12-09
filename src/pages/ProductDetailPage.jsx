@@ -36,11 +36,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 const placeholderImage =
   "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzc0MTUxIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlDQTNBRiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pgo8L3N2Zz4K";
 
-const benefits = [
-  { icon: Zap, text: "Instant Delivery" },
-  { icon: Award, text: "Premium Quality" },
-  { icon: ShieldCheck, text: "Lifetime Warranty" },
-  { icon: ThumbsUp, text: "Satisfaction Guaranteed" },
+const defaultFeatureBullets = [
+  "Instant Activation & Access",
+  "24/7 Priority VIP Support",
+  "Lifetime Updates Included",
+  "Commercial License",
 ];
 
 const mockReviews = [
@@ -327,6 +327,11 @@ function ProductDetailPage() {
   const currentImage = product.images && product.images[currentImageIndex];
   const hasMultipleImages = product.images && product.images.length > 1;
 
+  const featureBullets =
+    product.features && product.features.length > 0
+      ? product.features
+      : defaultFeatureBullets;
+
   return (
     <>
       <Helmet>
@@ -601,18 +606,18 @@ function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* Benefits List */}
+              {/* Benefits / Feature bullets */}
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                  Why choose this?
+                  What you get
                 </h3>
-                {benefits.map((benefit, i) => (
+                {featureBullets.map((text, i) => (
                   <div
                     key={i}
                     className="flex items-center gap-3 text-gray-300"
                   >
-                    <benefit.icon className="w-5 h-5 text-cyan-500" />
-                    <span>{benefit.text}</span>
+                    <CheckCircle className="w-4 h-4 text-cyan-500" />
+                    <span>{text}</span>
                   </div>
                 ))}
               </div>
@@ -723,34 +728,51 @@ function ProductDetailPage() {
                       <p className="text-sm">More products coming soon.</p>
                     </div>
                   ) : (
-                    relatedProducts.map((rp) => (
-                      <Link
-                        to={`/product/${rp.id}`}
-                        key={rp.id}
-                        className="flex gap-4 group bg-white/5 p-3 rounded-xl border border-white/5 hover:border-white/20 transition-all hover:bg-white/10"
-                      >
-                        <div className="w-20 h-20 rounded-lg overflow-hidden bg-[#1A1A1A] flex-shrink-0">
-                          <img
-                            src={rp.images?.[0]?.url || placeholderImage}
-                            alt={rp.title}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                        </div>
-                        <div className="flex flex-col justify-center">
-                          <h4 className="text-sm font-semibold text-white line-clamp-2 group-hover:text-cyan-400 transition-colors">
-                            {rp.title}
-                          </h4>
-                          <p className="text-sm text-gray-400 mt-1">
-                            {formatCurrency(
-                              rp.variants?.[0]?.sale_price_in_cents ??
-                                rp.variants?.[0]?.price_in_cents ??
-                                0,
-                              rp.variants?.[0]?.currency || "EUR"
-                            )}
-                          </p>
-                        </div>
-                      </Link>
-                    ))
+                    relatedProducts.map((rp) => {
+                      const primaryVariant = rp.variants && rp.variants[0];
+                      const rpPriceCents = primaryVariant
+                        ? primaryVariant.sale_price_in_cents ?? primaryVariant.price_in_cents
+                        : 0;
+                      const rpCurrency = primaryVariant?.currency || "eur";
+
+                      const rpFeatures =
+                        rp.features && rp.features.length > 0
+                          ? rp.features.slice(0, 2)
+                          : defaultFeatureBullets.slice(0, 2);
+
+                      return (
+                        <Link
+                          to={`/product/${rp.id}`}
+                          key={rp.id}
+                          className="flex gap-4 group bg-white/5 p-3 rounded-xl border border-white/5 hover:border-white/20 transition-all hover:bg-white/10"
+                        >
+                          <div className="w-20 h-20 rounded-lg overflow-hidden bg-[#1A1A1A] flex-shrink-0">
+                            <img
+                              src={rp.images?.[0]?.url || placeholderImage}
+                              alt={rp.title}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                          </div>
+                          <div className="flex flex-col justify-center gap-1">
+                            <h4 className="text-sm font-semibold text-white line-clamp-2 group-hover:text-cyan-400 transition-colors">
+                              {rp.title}
+                            </h4>
+                            <p className="text-sm text-gray-400">
+                              {formatCurrency(rpPriceCents, rpCurrency)}
+                            </p>
+                            {rpFeatures.map((text, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-1 text-[10px] text-gray-400"
+                              >
+                                <CheckCircle className="w-3 h-3 text-cyan-400" />
+                                <span className="truncate">{text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </Link>
+                      );
+                    })
                   )}
                 </div>
               </div>

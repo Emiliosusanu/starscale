@@ -5,7 +5,7 @@
     "strict": true
   },
   "imports": {
-    "stripe": "https://esm.sh/stripe@14.10.0?target=deno",
+    "stripe": "https://esm.sh/stripe@14?target=denonext",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.30.0"
   },
   "tasks": {

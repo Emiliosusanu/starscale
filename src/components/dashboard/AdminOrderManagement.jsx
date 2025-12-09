@@ -35,7 +35,7 @@ const AdminOrderManagement = ({ order, isOpen, onClose, onUpdate }) => {
   const [actions, setActions] = useState([]);
   const [comments, setComments] = useState(order?.order_comments || []); 
   const [newComment, setNewComment] = useState('');
-  const [newTracking, setNewTracking] = useState({ carrier: '', number: '' });
+  const [newTracking, setNewTracking] = useState({ name: '', url: '' });
   
   // Editable fields (local state for immediate UI feedback)
   const [status, setStatus] = useState(order?.status || 'pending');
@@ -163,17 +163,25 @@ const AdminOrderManagement = ({ order, isOpen, onClose, onUpdate }) => {
   };
 
   const handleAddTracking = async () => {
-    if (!newTracking.number) return;
+    if (!newTracking.name.trim() || !newTracking.url.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Missing information",
+        description: "Please enter both a sheet name and a Google Sheets URL.",
+      });
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.from('order_tracking').insert({
       order_id: order.id,
-      carrier: newTracking.carrier || 'Unknown',
-      tracking_number: newTracking.number,
+      sheet_name: newTracking.name.trim(),
+      sheet_url: newTracking.url.trim(),
     });
 
     if (!error) {
-      setNewTracking({ carrier: '', number: '' });
-      toast({ title: "Tracking Added" });
+      setNewTracking({ name: '', url: '' });
+      toast({ title: "Google Sheet linked", description: "Tracking sheet saved for this order." });
     } else {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -312,22 +320,23 @@ const AdminOrderManagement = ({ order, isOpen, onClose, onUpdate }) => {
               {/* TRACKING TAB */}
               <TabsContent value="tracking" className="mt-0 space-y-6 animate-in fade-in slide-in-from-bottom-2">
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-                   <h3 className="text-sm font-bold text-white mb-4">Add Tracking Info</h3>
+                   <h3 className="text-sm font-bold text-white mb-1">Google Sheet Tracking</h3>
+                   <p className="text-xs text-gray-400 mb-4">Attach a live Google Sheets link for this order. Every link you add is kept as history.</p>
                    <div className="grid gap-3">
                      <Input 
-                        placeholder="Carrier (e.g. DHL, FedEx)" 
-                        value={newTracking.carrier}
-                        onChange={e => setNewTracking({...newTracking, carrier: e.target.value})}
-                        className="bg-[#0A0A0A] border-white/10 text-white"
+                        placeholder="Sheet name (internal)" 
+                        value={newTracking.name}
+                        onChange={e => setNewTracking({...newTracking, name: e.target.value})}
+                        className="bg-[#0A0A0A] border-white/10 text-white text-sm"
                      />
                      <div className="flex gap-2">
                         <Input 
-                            placeholder="Tracking Number" 
-                            value={newTracking.number}
-                            onChange={e => setNewTracking({...newTracking, number: e.target.value})}
-                            className="bg-[#0A0A0A] border-white/10 text-white"
+                            placeholder="Google Sheets URL (https://...)" 
+                            value={newTracking.url}
+                            onChange={e => setNewTracking({...newTracking, url: e.target.value})}
+                            className="bg-[#0A0A0A] border-white/10 text-white text-sm"
                         />
-                        <Button onClick={handleAddTracking} disabled={!newTracking.number || loading} className="shrink-0">
+                        <Button onClick={handleAddTracking} disabled={!newTracking.url || !newTracking.name || loading} className="shrink-0">
                             {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <Send className="w-4 h-4"/>}
                         </Button>
                      </div>
@@ -343,14 +352,25 @@ const AdminOrderManagement = ({ order, isOpen, onClose, onUpdate }) => {
                           <div className="flex items-center gap-3">
                              <Truck className="w-5 h-5 text-cyan-400" />
                              <div>
-                                <p className="text-sm font-bold text-white">{track.carrier}</p>
-                                <p className="text-xs text-gray-400 font-mono">{track.tracking_number}</p>
+                                <p className="text-sm font-bold text-white">{track.sheet_name || track.carrier || 'Tracking link'}</p>
+                                {track.sheet_url ? (
+                                  <a
+                                    href={track.sheet_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs text-cyan-400 hover:text-cyan-300 underline"
+                                  >
+                                    Open Google Sheet
+                                  </a>
+                                ) : track.tracking_number ? (
+                                  <p className="text-xs text-gray-400 font-mono">{track.tracking_number}</p>
+                                ) : null}
                              </div>
                           </div>
                           <span className="text-[10px] text-gray-500">{timeAgo(track.created_at)}</span>
                        </div>
                      ))
-                   ) : <p className="text-center text-gray-500 text-sm">No tracking info yet.</p>}
+                   ) : <p className="text-center text-gray-500 text-sm">No tracking links yet.</p>}
                 </div>
               </TabsContent>
 

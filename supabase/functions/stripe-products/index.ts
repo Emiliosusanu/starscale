@@ -2,12 +2,10 @@
 // Fetches products from Stripe and transforms to frontend format
 
 // deno-lint-ignore-file
-import Stripe from 'https://esm.sh/stripe@14.10.0?target=deno';
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import Stripe from 'https://esm.sh/stripe@14?target=denonext';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
-  httpClient: Stripe.createFetchHttpClient(),
 });
 
 const corsHeaders = {
@@ -16,7 +14,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });

@@ -9,7 +9,6 @@ import {
   Settings, 
   Bell, 
   Shield, 
-  CreditCard,
   Loader2
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
@@ -20,13 +19,13 @@ import AccountTab from '@/components/settings/AccountTab';
 import PreferencesTab from '@/components/settings/PreferencesTab';
 import NotificationsTab from '@/components/settings/NotificationsTab';
 import SecurityTab from '@/components/settings/SecurityTab';
-import BillingTab from '@/components/settings/BillingTab';
 
 const SettingsPage = () => {
   const { user, profile, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const defaultTab = searchParams.get('tab') || 'account';
+  const requestedTab = searchParams.get('tab');
+  const defaultTab = requestedTab === 'billing' || !requestedTab ? 'account' : requestedTab;
 
   // Global State for the page to pass down
   const [preferences, setPreferences] = useState({
@@ -77,7 +76,6 @@ const SettingsPage = () => {
     { id: 'preferences', label: 'Preferences', icon: Settings, desc: 'Theme & language' },
     { id: 'notifications', label: 'Notifications', icon: Bell, desc: 'Email & push alerts' },
     { id: 'security', label: 'Security', icon: Shield, desc: 'Password & 2FA' },
-    { id: 'billing', label: 'Billing', icon: CreditCard, desc: 'Payment methods & invoices' },
   ];
 
   return (
@@ -93,7 +91,7 @@ const SettingsPage = () => {
             className="mb-10"
           >
             <h1 className="text-3xl font-bold text-white mb-2">Account Settings</h1>
-            <p className="text-gray-400">Manage your profile, security preferences, and billing information.</p>
+            <p className="text-gray-400">Manage your profile, security preferences, and account settings.</p>
           </motion.div>
 
           <Tabs defaultValue={defaultTab} className="flex flex-col lg:flex-row gap-8">
@@ -152,12 +150,6 @@ const SettingsPage = () => {
                     <SecurityTab 
                         user={user} 
                         signOut={signOut} 
-                    />
-                </TabsContent>
-
-                <TabsContent value="billing" className="mt-0">
-                    <BillingTab 
-                        userId={user.id} 
                     />
                 </TabsContent>
             </div>

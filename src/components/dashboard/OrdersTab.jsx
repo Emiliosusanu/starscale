@@ -394,12 +394,23 @@ const OrdersTab = ({ orders, loading, highlightedOrderId }) => {
                                   {trackingData[order.id].map((t) => (
                                     <div
                                       key={t.id}
-                                      className="flex justify-between text-sm text-gray-300"
+                                      className="flex justify-between items-center text-sm text-gray-300"
                                     >
-                                      <span>{t.carrier}</span>
-                                      <span className="font-mono text-white">
-                                        {t.tracking_number}
-                                      </span>
+                                      <span>{t.sheet_name || t.carrier}</span>
+                                      {t.sheet_url ? (
+                                        <a
+                                          href={t.sheet_url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-xs text-cyan-300 hover:text-cyan-200 underline"
+                                        >
+                                          Open Sheet
+                                        </a>
+                                      ) : (
+                                        <span className="font-mono text-white">
+                                          {t.tracking_number}
+                                        </span>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -577,11 +588,22 @@ const OrdersTab = ({ orders, loading, highlightedOrderId }) => {
                             Tracking
                           </h5>
                           {trackingData[order.id].map((t) => (
-                            <div key={t.id} className="flex justify-between">
-                              <span className="text-gray-300">{t.carrier}</span>
-                              <span className="font-mono text-white">
-                                {t.tracking_number}
-                              </span>
+                            <div key={t.id} className="flex justify-between items-center">
+                              <span className="text-gray-300">{t.sheet_name || t.carrier}</span>
+                              {t.sheet_url ? (
+                                <a
+                                  href={t.sheet_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] text-cyan-300 hover:text-cyan-200 underline"
+                                >
+                                  Open Sheet
+                                </a>
+                              ) : (
+                                <span className="font-mono text-white">
+                                  {t.tracking_number}
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>

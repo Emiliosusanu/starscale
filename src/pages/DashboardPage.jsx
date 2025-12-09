@@ -12,6 +12,7 @@ import SupportTab from '@/components/dashboard/SupportTab';
 import AdminOrdersTab from '@/components/dashboard/AdminOrdersTab';
 import PlatformManagementTab from '@/components/dashboard/PlatformManagementTab';
 import AdminActivityLogTab from '@/components/dashboard/AdminActivityLogTab';
+import AdminProductsTab from '@/components/dashboard/AdminProductsTab';
 import { useSearchParams } from 'react-router-dom';
 import { formatPrice, playNotificationSound } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
@@ -29,6 +30,7 @@ const DashboardPage = () => {
   const isAdmin = profile?.role === 'admin';
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'orders');
+  const [ordersClientFilterId, setOrdersClientFilterId] = useState(null);
 
   // Smart Navigation State
   const [highlightedOrderId, setHighlightedOrderId] = useState(null);
@@ -63,6 +65,12 @@ const DashboardPage = () => {
     });
     if (value !== 'support') setIsChatOpen(false);
   };
+
+	const handleViewClientOrders = (client) => {
+		if (!client?.id) return;
+		setOrdersClientFilterId(client.id);
+		handleTabChange('admin-orders');
+	};
 
   const handleTicketRead = useCallback((count) => {
     setUnreadTicketCount(prev => Math.max(0, prev - count));
@@ -141,6 +149,18 @@ const DashboardPage = () => {
     }
   }, [user, profile, isAdmin, toast]);
 
+	useEffect(() => {
+		const tabFromUrl = searchParams.get('tab');
+		if (isAdmin && !tabFromUrl && activeTab === 'orders') {
+			setActiveTab('admin-orders');
+			setSearchParams((prev) => {
+				const newParams = new URLSearchParams(prev);
+				newParams.set('tab', 'admin-orders');
+				return newParams;
+			});
+		}
+	}, [isAdmin, searchParams, setSearchParams, activeTab]);
+
   useEffect(() => {
     if (!authLoading && profile) {
       fetchDashboardData(false); // Initial load
@@ -205,16 +225,30 @@ const DashboardPage = () => {
     <div className="glass-card px-5 py-4 rounded-xl flex items-center gap-4 border border-white/5 bg-[#121212]">
       <div className="p-2.5 bg-cyan-500/10 rounded-lg shrink-0">{icon}</div>
       <div>
-        <p className="text-gray-400 text-xs uppercase tracking-wider font-medium">{title}</p>
-        <p className="text-xl font-bold text-white mt-0.5">{value}</p>
+        <p className="text-[11px] md:text-xs uppercase tracking-[0.22em] text-gray-300 font-semibold">{title}</p>
+        <p className="text-2xl md:text-3xl font-extrabold text-white mt-0.5 leading-tight">{value}</p>
       </div>
     </div>
   );
   
   const userOrders = isAdmin ? orders : orders.filter(o => o.profile_id === profile?.id);
   const totalSpentCents = userOrders.filter(o => o.payment_status === 'paid').reduce((acc, order) => acc + (order.total_cost || 0), 0);
-  
-  const tabsCountClass = isAdmin ? 'grid-cols-5' : 'grid-cols-2';
+
+	const totalOrders = orders.length;
+	const paidOrdersCount = orders.filter(o => o.payment_status === 'paid').length;
+	const openOrdersCount = orders.filter((o) => o.status && o.status !== 'completed').length;
+	const totalUsers = platformData.users?.length || 0;
+	const now = new Date();
+	const sevenDaysAgo = new Date(now);
+	sevenDaysAgo.setDate(now.getDate() - 7);
+	const newUsers7d = platformData.users.filter((u) =>
+		u?.created_at ? new Date(u.created_at) >= sevenDaysAgo : false,
+	).length;
+
+	const tabsCountClass = isAdmin ? 'grid-cols-5' : 'grid-cols-2';
+	const focusedClient = isAdmin && ordersClientFilterId
+		? platformData.users.find((u) => u.id === ordersClientFilterId)
+		: null;
 
   if (authLoading) {
     return (
@@ -245,104 +279,131 @@ const DashboardPage = () => {
       <Helmet>
         <title>Dashboard</title>
       </Helmet>
-      <div className="container mx-auto px-4 py-20 max-w-7xl min-h-screen flex flex-col">
+      <div className="container mx-auto px-4 py-20 max-w-[112rem] min-h-screen flex flex-col">
         
-        <header className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-              Your Dashboard
-              {syncing && (
-                  <Badge variant="outline" className="border-cyan-500/30 text-cyan-400 text-[10px] px-2 py-0.5 animate-pulse gap-1">
-                      <Zap className="w-3 h-3 fill-current" /> Live
-                  </Badge>
-              )}
-            </h1>
-            <p className="text-sm text-gray-400 mt-1">Welcome back, {profile?.email}</p>
-          </div>
-          <Button onClick={signOut} variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/5 w-fit">
-            Sign Out
-          </Button>
-        </header>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard title="Orders" value={loading ? '-' : userOrders.length} icon={<ShoppingBag className="w-5 h-5 text-cyan-400"/>} />
-          <StatCard title="Spent" value={loading ? '-' : formatPrice(totalSpentCents)} icon={<DollarSign className="w-5 h-5 text-cyan-400"/>} />
-          <StatCard title="Rewards" value="0 Pts" icon={<Crown className="w-5 h-5 text-yellow-400"/>} />
-          <StatCard title="Notifications" value="0" icon={<Bell className="w-5 h-5 text-gray-400"/>} />
+        <div className={`grid gap-4 mb-8 ${isAdmin ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
+          {isAdmin ? (
+            <>
+              <StatCard title="Total Orders" value={loading ? '-' : totalOrders} icon={<ShoppingBag className="w-5 h-5 text-cyan-400" />} />
+              <StatCard title="Paid Orders" value={loading ? '-' : paidOrdersCount} icon={<DollarSign className="w-5 h-5 text-cyan-400" />} />
+              <StatCard title="Open Orders" value={loading ? '-' : openOrdersCount} icon={<Shield className="w-5 h-5 text-emerald-400" />} />
+              <StatCard title="Total Revenue" value={loading ? '-' : formatPrice(platformData.totalRevenue)} icon={<Zap className="w-5 h-5 text-yellow-400" />} />
+              <StatCard title="New Users (7d)" value={loading ? '-' : newUsers7d} icon={<User className="w-5 h-5 text-cyan-400" />} />
+            </>
+          ) : (
+            <>
+              <StatCard title="Orders" value={loading ? '-' : userOrders.length} icon={<ShoppingBag className="w-5 h-5 text-cyan-400" />} />
+              <StatCard title="Spent" value={loading ? '-' : formatPrice(totalSpentCents)} icon={<DollarSign className="w-5 h-5 text-cyan-400" />} />
+              <StatCard title="Rewards" value="0 Pts" icon={<Crown className="w-5 h-5 text-yellow-400" />} />
+              <StatCard title="Notifications" value="0" icon={<Bell className="w-5 h-5 text-gray-400" />} />
+            </>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full flex-1 flex flex-col">
           <TabsList className={`grid w-full ${tabsCountClass} max-w-3xl mx-auto mb-6 bg-[#121212] border border-white/10 h-12 p-1 rounded-xl`}>
-            <TabsTrigger value="orders" className="rounded-lg text-xs md:text-sm">
-              <User className="w-3.5 h-3.5 mr-2" />
-              My Orders
-            </TabsTrigger>
-            <TabsTrigger value="support" className="relative rounded-lg text-xs md:text-sm">
-              <LifeBuoy className="w-3.5 h-3.5 mr-2" />
-              Support
-              {unreadTicketCount > 0 && !isChatOpen && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              )}
-            </TabsTrigger>
-            {isAdmin && (
+            {isAdmin ? (
               <>
-                <TabsTrigger value="admin-orders" className="rounded-lg text-xs md:text-sm"><Shield className="w-3.5 h-3.5 mr-1 md:mr-2" /> Admin</TabsTrigger>
-                <TabsTrigger value="platform-management" className="rounded-lg text-xs md:text-sm"><Settings className="w-3.5 h-3.5 mr-1 md:mr-2" /> Platform</TabsTrigger>
-                <TabsTrigger value="activity-log" className="rounded-lg text-xs md:text-sm"><History className="w-3.5 h-3.5 mr-1 md:mr-2" /> Log</TabsTrigger>
+                <TabsTrigger value="admin-orders" className="rounded-lg text-xs md:text-sm">
+                  <Shield className="w-3.5 h-3.5 mr-1 md:mr-2" /> Admin
+                </TabsTrigger>
+                <TabsTrigger value="platform-management" className="rounded-lg text-xs md:text-sm">
+                  <Settings className="w-3.5 h-3.5 mr-1 md:mr-2" /> Platform
+                </TabsTrigger>
+                <TabsTrigger value="admin-products" className="rounded-lg text-xs md:text-sm">
+                  <ShoppingBag className="w-3.5 h-3.5 mr-1 md:mr-2" /> Products
+                </TabsTrigger>
+                <TabsTrigger value="activity-log" className="rounded-lg text-xs md:text-sm">
+                  <History className="w-3.5 h-3.5 mr-1 md:mr-2" /> Log
+                </TabsTrigger>
+                <TabsTrigger value="support" className="relative rounded-lg text-xs md:text-sm">
+                  <LifeBuoy className="w-3.5 h-3.5 mr-2" />
+                  Support
+                  {unreadTicketCount > 0 && !isChatOpen && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  )}
+                </TabsTrigger>
+              </>
+            ) : (
+              <>
+                <TabsTrigger value="orders" className="rounded-lg text-xs md:text-sm">
+                  <User className="w-3.5 h-3.5 mr-2" />
+                  My Orders
+                </TabsTrigger>
+                <TabsTrigger value="support" className="relative rounded-lg text-xs md:text-sm">
+                  <LifeBuoy className="w-3.5 h-3.5 mr-2" />
+                  Support
+                  {unreadTicketCount > 0 && !isChatOpen && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  )}
+                </TabsTrigger>
               </>
             )}
           </TabsList>
 
           <div className="flex-1">
-            <TabsContent value="orders" className="mt-0">
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                <OrdersTab 
-                  orders={userOrders} 
-                  loading={loading} 
+            {!isAdmin && (
+              <TabsContent value="orders" className="mt-0">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <OrdersTab 
+                    orders={userOrders} 
+                    loading={loading} 
+                    highlightedOrderId={highlightedOrderId} 
+                  />
+                </motion.div>
+              </TabsContent>
+            )}
+            
+            <TabsContent value="support" className="mt-0 h-full">
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="h-full">
+                <SupportTab 
+                  onChatOpenChange={setIsChatOpen} 
+                  onTicketRead={handleTicketRead}
+                  initialTicketId={highlightedTicketId} 
                   highlightedOrderId={highlightedOrderId} 
                 />
               </motion.div>
             </TabsContent>
-            
-            <TabsContent value="support" className="mt-0 h-full">
-               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="h-full">
-                <SupportTab 
-                    onChatOpenChange={setIsChatOpen} 
-                    onTicketRead={handleTicketRead}
-                    initialTicketId={highlightedTicketId} 
-                />
-              </motion.div>
-            </TabsContent>
-            
-            {isAdmin && (
-              <>
-                <TabsContent value="admin-orders" className="mt-0">
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                    <AdminOrdersTab 
-                        allOrders={orders} 
-                        loading={loading} 
-                        onUpdate={() => fetchDashboardData(true)} 
-                        highlightedOrderId={highlightedOrderId}
-                    />
-                  </motion.div>
-                </TabsContent>
-                <TabsContent value="platform-management" className="mt-0">
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                    <PlatformManagementTab 
-                      users={platformData.users} 
-                      totalRevenue={platformData.totalRevenue} 
-                      loading={loading}
-                      onUserUpdate={() => fetchDashboardData(true)}
-                    />
-                  </motion.div>
-                </TabsContent>
-                <TabsContent value="activity-log" className="mt-0">
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                    <AdminActivityLogTab />
-                  </motion.div>
-                </TabsContent>
-              </>
-            )}
+          
+          {isAdmin && (
+            <>
+              <TabsContent value="admin-orders" className="mt-0">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <AdminOrdersTab 
+                    allOrders={orders} 
+                    loading={loading} 
+                    onUpdate={() => fetchDashboardData(true)} 
+                    highlightedOrderId={highlightedOrderId}
+                    filterProfileId={ordersClientFilterId}
+                    filterLabel={focusedClient?.email || focusedClient?.full_name || ''}
+                    onClearFilter={() => setOrdersClientFilterId(null)}
+                  />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="admin-products" className="mt-0">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <AdminProductsTab />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="platform-management" className="mt-0">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <PlatformManagementTab 
+                    users={platformData.users} 
+                    totalRevenue={platformData.totalRevenue} 
+                    loading={loading}
+                    orders={orders}
+                    onUserUpdate={() => fetchDashboardData(true)}
+                    onViewClientOrders={handleViewClientOrders}
+                  />
+                </motion.div>
+              </TabsContent>
+              <TabsContent value="activity-log" className="mt-0">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <AdminActivityLogTab />
+                </motion.div>
+              </TabsContent>
+            </>
+          )}
           </div>
         </Tabs>
       </div>

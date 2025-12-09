@@ -27,6 +27,23 @@
   --radius: 0.75rem;
 }
 
+.theme-dark {
+	background-color: #0a0a0a;
+	color: hsl(var(--foreground));
+}
+
+.theme-light {
+	background-color: #f9fafb;
+	color: #020617;
+}
+
+.theme-focus {
+	background-color: #050608;
+	color: hsl(var(--foreground));
+	background-image: radial-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+	background-size: 36px 36px;
+}
+
 * {
   border-color: hsl(var(--border));
   -webkit-font-smoothing: antialiased;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -13,9 +12,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import AdminOrderManagement from '@/components/dashboard/AdminOrderManagement';
 
-const AdminOrdersTab = ({ allOrders, loading, onUpdate, highlightedOrderId }) => {
+const AdminOrdersTab = ({ allOrders, loading, onUpdate, highlightedOrderId, filterProfileId, filterLabel, onClearFilter }) => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+	const visibleOrders = filterProfileId
+		? allOrders.filter((o) => o.profile_id === filterProfileId)
+		: allOrders;
 
   useEffect(() => {
     if (highlightedOrderId && allOrders.length > 0) {
@@ -41,12 +43,31 @@ const AdminOrdersTab = ({ allOrders, loading, onUpdate, highlightedOrderId }) =>
   return (
     <>
     <div className="rounded-xl border border-white/10 bg-[#121212] overflow-hidden">
-        <div className="overflow-x-auto">
+			{filterProfileId && (
+				<div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-black/40 text-[11px] text-gray-400">
+					<span>
+						Viewing orders for{' '}
+						<span className="font-semibold text-white">{filterLabel || filterProfileId}</span>
+					</span>
+					{onClearFilter && (
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-7 px-2 text-[11px] text-gray-300 hover:text-white hover:bg-white/10"
+							onClick={onClearFilter}
+						>
+							Clear
+						</Button>
+					)}
+				</div>
+			)}
+			<div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-white/5">
               <TableRow className="border-b-white/5 hover:bg-transparent">
                 <TableHead className="text-gray-400 text-xs uppercase h-9">ID</TableHead>
                 <TableHead className="text-gray-400 text-xs uppercase h-9">User</TableHead>
+                <TableHead className="text-gray-400 text-xs uppercase h-9">Created</TableHead>
                 <TableHead className="text-gray-400 text-xs uppercase h-9">Status</TableHead>
                 <TableHead className="text-gray-400 text-xs uppercase h-9">Total</TableHead>
                 <TableHead className="text-gray-400 text-xs uppercase h-9 text-right">Action</TableHead>
@@ -54,13 +75,26 @@ const AdminOrdersTab = ({ allOrders, loading, onUpdate, highlightedOrderId }) =>
             </TableHeader>
             <TableBody>
               {loading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto text-cyan-500"/></TableCell></TableRow>
-              ) : allOrders.map(order => {
+					<TableRow>
+						<TableCell colSpan={6} className="text-center py-8">
+							<Loader2 className="w-6 h-6 animate-spin mx-auto text-cyan-500" />
+						</TableCell>
+					</TableRow>
+				) : visibleOrders.length === 0 ? (
+					<TableRow>
+						<TableCell colSpan={6} className="text-center py-8 text-sm text-gray-500">
+							{filterProfileId ? 'No orders found for this client yet.' : 'No orders found.'}
+						</TableCell>
+					</TableRow>
+				) : visibleOrders.map(order => {
                  const isHighlighted = highlightedOrderId === order.id;
                  return (
                 <TableRow key={order.id} className={`border-b-white/5 hover:bg-white/[0.02] ${isHighlighted ? 'bg-cyan-500/10' : ''}`}>
                   <TableCell className="font-mono text-xs text-gray-400">#{order.id.slice(0,8)}</TableCell>
                   <TableCell className="text-sm text-white">{order.email}</TableCell>
+                  <TableCell className="text-[11px] text-gray-400 whitespace-nowrap">
+                    {order.created_at ? new Date(order.created_at).toLocaleString() : '—'}
+                  </TableCell>
                   <TableCell>
                       <div className="flex flex-col gap-1">
                          <span className={`w-fit px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${order.status === 'completed' || order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
