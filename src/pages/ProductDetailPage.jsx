@@ -741,10 +741,12 @@ function ProductDetailPage() {
                             {rp.title}
                           </h4>
                           <p className="text-sm text-gray-400 mt-1">
-                            {(rp.price_in_cents / 100).toLocaleString("en-US", {
-                              style: "currency",
-                              currency: "USD",
-                            })}
+                            {formatCurrency(
+                              rp.variants?.[0]?.sale_price_in_cents ??
+                                rp.variants?.[0]?.price_in_cents ??
+                                0,
+                              rp.variants?.[0]?.currency || "EUR"
+                            )}
                           </p>
                         </div>
                       </Link>
