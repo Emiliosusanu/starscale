@@ -73,12 +73,37 @@ serve(async (req: Request) => {
       invoice_creation: { enabled: true },
     };
 
-    if (discountAmountCents > 0) {
+    // Compute automatic sale discount based on price.metadata.sale_price
+    let saleDiscountCents = 0;
+    try {
+      const priceObjs = await Promise.all(items.map((it: any) => stripe.prices.retrieve(it.variant_id)));
+      for (let i = 0; i < items.length; i++) {
+        const pr: any = priceObjs[i];
+        const qty = Math.max(1, Number(items[i].quantity) || 1);
+        const base = Number(pr.unit_amount) || 0;
+        const saleMeta = pr.metadata?.sale_price ? Number(pr.metadata.sale_price) : null;
+        if (saleMeta && !Number.isNaN(saleMeta) && saleMeta < base) {
+          saleDiscountCents += (base - saleMeta) * qty;
+        }
+      }
+    } catch (_) {
+      // ignore; no sale discount
+    }
+
+    const totalDiscountCents = Math.max(0, (discountAmountCents || 0) + saleDiscountCents);
+    if (totalDiscountCents > 0) {
+      // Use the first price currency (assumes single currency store)
+      let couponCurrency = 'eur';
+      try {
+        const firstPrice = await stripe.prices.retrieve(items[0].variant_id);
+        couponCurrency = (firstPrice.currency || 'eur').toLowerCase();
+      } catch {}
+
       const coupon = await stripe.coupons.create({
-        amount_off: discountAmountCents,
-        currency: 'eur',
+        amount_off: totalDiscountCents,
+        currency: couponCurrency,
         duration: 'once',
-        name: 'Bundle Discount (30% Off)',
+        name: 'Promotional Discount',
       });
       sessionParams.discounts = [{ coupon: coupon.id }];
     }

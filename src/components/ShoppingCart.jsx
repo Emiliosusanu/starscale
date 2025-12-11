@@ -331,7 +331,7 @@ const ShoppingCart = ({ isCartOpen, setIsCartOpen }) => {
                       Looks like you haven't added anything yet.
                     </p>
                     <Button
-                      onClick={() => setIsCartOpen(false)}
+                      onClick={() => { setIsCartOpen(false); navigate('/store'); }}
                       variant="outline"
                       className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
                     >

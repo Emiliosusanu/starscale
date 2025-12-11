@@ -286,7 +286,7 @@ const DashboardPage = () => {
             <>
               <StatCard title="Total Orders" value={loading ? '-' : totalOrders} icon={<ShoppingBag className="w-5 h-5 text-cyan-400" />} />
               <StatCard title="Paid Orders" value={loading ? '-' : paidOrdersCount} icon={<DollarSign className="w-5 h-5 text-cyan-400" />} />
-              <StatCard title="Open Orders" value={loading ? '-' : openOrdersCount} icon={<Shield className="w-5 h-5 text-emerald-400" />} />
+              <StatCard title="Total Users" value={loading ? '-' : totalUsers} icon={<User className="w-5 h-5 text-cyan-400" />} />
               <StatCard title="Total Revenue" value={loading ? '-' : formatPrice(platformData.totalRevenue)} icon={<Zap className="w-5 h-5 text-yellow-400" />} />
               <StatCard title="New Users (7d)" value={loading ? '-' : newUsers7d} icon={<User className="w-5 h-5 text-cyan-400" />} />
             </>

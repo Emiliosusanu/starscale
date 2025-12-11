@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
       password,
       options: {
         ...options,
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/store`,
+        emailRedirectTo: `${window.location.origin}/store`,
       },
     });
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { playNotificationChime } from '@/utils/buttonSound'
 
 const TOAST_LIMIT = 1
 
@@ -57,6 +58,8 @@ export const toast = ({ ...props }) => {
       ...state.toasts,
     ].slice(0, TOAST_LIMIT),
   }))
+
+  try { playNotificationChime() } catch {}
 
   return {
     id,

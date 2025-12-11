@@ -16,7 +16,6 @@ import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import DashboardPage from '@/pages/DashboardPage';
 import SettingsPage from '@/pages/SettingsPage';
-import AuthCallback from '@/pages/AuthCallback';
 import { Toaster } from '@/components/ui/toaster';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { AnimatePresence } from 'framer-motion';
@@ -93,7 +92,6 @@ function App() {
             />
 
             <Route path="success" element={<SuccessPage />} />
-            <Route path="auth/callback" element={<AuthCallback />} />
 
             <Route 
               path="login" 

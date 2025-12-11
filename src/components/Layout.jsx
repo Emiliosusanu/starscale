@@ -47,26 +47,39 @@ const Layout = () => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleClick = (event) => {
+    const selector = 'button, [role="button"], a, input[type="button"], input[type="submit"]';
+
+    const handlePointerDown = (event) => {
       try {
+        if (event.button !== undefined && event.button !== 0) return;
         const target = event.target;
         if (!target || typeof target.closest !== 'function') return;
-
-        const el = target.closest('button, [role="button"]');
+        const el = target.closest(selector);
         if (!el) return;
-
-        if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') {
-          return;
-        }
-
+        if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return;
         playClickSound();
-      } catch {
-        // ignore
-      }
+      } catch {}
     };
 
-    window.addEventListener('click', handleClick, true);
-    return () => window.removeEventListener('click', handleClick, true);
+    const handleKeyDown = (event) => {
+      try {
+        const key = event.key;
+        if (key !== 'Enter' && key !== ' ') return;
+        const target = event.target;
+        if (!target || typeof target.closest !== 'function') return;
+        const el = target.closest(selector);
+        if (!el) return;
+        if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return;
+        playClickSound();
+      } catch {}
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown, true);
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, []);
 
   const themeClass =
