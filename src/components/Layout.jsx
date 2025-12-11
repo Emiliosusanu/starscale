@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ShoppingCart from '@/components/ShoppingCart';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
+import { playClickSound } from '@/utils/buttonSound';
 
 const Layout = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -41,6 +42,31 @@ const Layout = () => {
 
     window.addEventListener('starscale-theme-change', handler);
     return () => window.removeEventListener('starscale-theme-change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleClick = (event) => {
+      try {
+        const target = event.target;
+        if (!target || typeof target.closest !== 'function') return;
+
+        const el = target.closest('button, [role="button"]');
+        if (!el) return;
+
+        if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') {
+          return;
+        }
+
+        playClickSound();
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('click', handleClick, true);
+    return () => window.removeEventListener('click', handleClick, true);
   }, []);
 
   const themeClass =

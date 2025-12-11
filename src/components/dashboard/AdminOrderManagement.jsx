@@ -189,20 +189,38 @@ const AdminOrderManagement = ({ order, isOpen, onClose, onUpdate }) => {
   };
 
   const handleRefund = async () => {
-    if(!window.confirm("Are you sure you want to mark this order as refunded? This action cannot be undone.")) return;
+    if (!window.confirm("Issue a Stripe refund for this order?")) return;
     setLoading(true);
-    const { error } = await supabase.from('orders').update({ payment_status: 'refunded' }).eq('id', order.id);
-    if (!error) {
-        toast({ title: "Order Refunded", description: "Payment status set to refunded." });
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-refund', {
+        body: { order_id: order.id },
+      });
+      if (error) throw error;
+
+      const amount = (data?.refund?.amount ?? 0) / 100;
+      const currency = (data?.refund?.currency || '').toUpperCase();
+      const status = data?.refund?.status || 'created';
+
+      toast({
+        title: "Refund issued",
+        description: `Refund ${status}${amount ? ` • ${amount.toFixed(2)} ${currency}` : ''}`,
+      });
+
+      if (data?.refund?.full_refund) {
         setPaymentStatus('refunded');
-        onUpdate();
-    } else {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+      onUpdate();
+    } catch (e) {
+      const message = e?.message || 'Refund failed';
+      toast({ title: "Refund failed", description: message, variant: "destructive" });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!order) return null;
+
+  const canRefund = paymentStatus === 'paid' && status !== 'cancelled';
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -310,11 +328,27 @@ const AdminOrderManagement = ({ order, isOpen, onClose, onUpdate }) => {
                 </div>
                 
                 {/* Refund Action */}
-                {paymentStatus === 'paid' && (
-                    <Button variant="destructive" onClick={handleRefund} className="w-full" disabled={loading}>
-                        <CreditCard className="w-4 h-4 mr-2"/> {loading ? <Loader2 className="animate-spin w-4 h-4" /> : 'Refund Order'}
-                    </Button>
-                )}
+                <div className="pt-2">
+                  <Button
+                    variant={canRefund ? 'destructive' : 'secondary'}
+                    onClick={handleRefund}
+                    className="w-full"
+                    disabled={loading || !canRefund}
+                  >
+                    {loading ? (
+                      <Loader2 className="animate-spin w-4 h-4 mr-2" />
+                    ) : (
+                      <CreditCard className="w-4 h-4 mr-2" />
+                    )}
+                    {canRefund
+                      ? 'Refund Order'
+                      : paymentStatus === 'refunded'
+                        ? 'Already Refunded'
+                        : status === 'cancelled'
+                          ? 'Order Cancelled'
+                          : 'No Payment'}
+                  </Button>
+                </div>
               </TabsContent>
 
               {/* TRACKING TAB */}

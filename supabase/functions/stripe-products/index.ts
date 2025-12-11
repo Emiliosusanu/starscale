@@ -109,8 +109,33 @@ function transformProduct(product: any, prices: any[]) {
     (a.unit_amount || 0) - (b.unit_amount || 0)
   );
 
-  // Extract marketing features from Stripe product
-  const features = product.marketing_features?.map((f: any) => f.name) || [];
+  // Resolve feature/spec bullets for storefront.
+  // Prefer metadata.features_json (stored as JSON string), then fall back to marketing_features.
+  let features: string[] = [];
+
+  const rawFeatures = product.metadata?.features_json;
+  if (typeof rawFeatures === 'string' && rawFeatures.length) {
+    try {
+      const parsed = JSON.parse(rawFeatures);
+      if (Array.isArray(parsed)) {
+        features = parsed
+          .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
+          .filter((item) => item.length > 0);
+      }
+    } catch {
+      // Ignore parse errors and fall back to marketing_features
+    }
+  }
+
+  if (!features.length && Array.isArray(product.marketing_features)) {
+    features = product.marketing_features
+      .map((f: any) => {
+        if (typeof f === 'string') return f;
+        if (f && typeof f === 'object' && typeof f.name === 'string') return f.name;
+        return '';
+      })
+      .filter((item: string) => item.length > 0);
+  }
 
   return {
     id: product.id,
@@ -127,7 +152,7 @@ function transformProduct(product: any, prices: any[]) {
     purchasable: product.active,
     order: parseInt(product.metadata?.order || '0'),
     site_product_selection: 'lowest_price_first',
-    features, // Marketing features from Stripe
+    features,
     variants: sortedPrices.map((price: any) => ({
       id: price.id,
       title: price.nickname || 'Default',

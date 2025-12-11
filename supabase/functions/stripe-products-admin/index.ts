@@ -94,9 +94,21 @@ serve(async (req: Request) => {
 
     if (typeof name === 'string') productUpdate.name = name;
     if (typeof description === 'string') productUpdate.description = description;
-    if (typeof image === 'string') productUpdate.images = image ? [image] : [];
 
-    // Metadata merge for subtitle / ribbon
+    // Image handling: Stripe expects real URLs for product images.
+    // - If the field is empty: clear images.
+    // - If it's an http/https URL: set as the sole image.
+    // - For anything else (e.g. base64 data URL): ignore to avoid 500 from Stripe.
+    if (typeof image === 'string') {
+      const trimmed = image.trim();
+      if (!trimmed) {
+        productUpdate.images = [];
+      } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        productUpdate.images = [trimmed];
+      }
+    }
+
+    // Metadata merge for subtitle / ribbon / feature bullets
     const currentProduct = await stripe.products.retrieve(productId);
     const existingMetadata = (currentProduct as any).metadata || {};
 
@@ -104,17 +116,28 @@ serve(async (req: Request) => {
     if (typeof subtitle === 'string') newMetadata.subtitle = subtitle;
     if (typeof ribbon_text === 'string') newMetadata.ribbon_text = ribbon_text;
 
+    let cleanedFeatures: string[] | undefined;
+    if (Array.isArray(features)) {
+      cleanedFeatures = features
+        .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
+        .filter((item) => item.length > 0);
+    }
+
+    if (cleanedFeatures && cleanedFeatures.length) {
+      newMetadata.features_json = JSON.stringify(cleanedFeatures);
+    } else {
+      // If no features provided, clear stored specs so storefront can fall back gracefully
+      if ('features_json' in newMetadata) {
+        delete newMetadata.features_json;
+      }
+    }
+
     productUpdate.metadata = newMetadata;
 
-    // Optional: sync marketing_features from features array
+    // Optional: also sync Stripe marketing_features for compatibility
     let marketingFeatures: Array<{ name: string }> | undefined;
-    if (Array.isArray(features) && features.length) {
-      marketingFeatures = features
-        .map((item: unknown) =>
-          typeof item === 'string' ? item.trim() : ''
-        )
-        .filter((item) => item.length > 0)
-        .map((name) => ({ name }));
+    if (cleanedFeatures && cleanedFeatures.length) {
+      marketingFeatures = cleanedFeatures.map((name) => ({ name }));
     }
 
     const updatedProduct = await stripe.products.update(productId, {
@@ -181,8 +204,33 @@ serve(async (req: Request) => {
 function transformProduct(product: any, prices: any[]) {
   const sortedPrices = [...prices].sort((a, b) => (a.unit_amount || 0) - (b.unit_amount || 0));
 
-  // Mirror storefront transform shape, including features from Stripe marketing_features
-  const features = product.marketing_features?.map((f: any) => f.name) || [];
+  // Mirror storefront transform shape, including feature bullets.
+  // Prefer metadata.features_json (stored as JSON string), then fall back to marketing_features.
+  let features: string[] = [];
+
+  const rawFeatures = product.metadata?.features_json;
+  if (typeof rawFeatures === 'string' && rawFeatures.length) {
+    try {
+      const parsed = JSON.parse(rawFeatures);
+      if (Array.isArray(parsed)) {
+        features = parsed
+          .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
+          .filter((item) => item.length > 0);
+      }
+    } catch {
+      // Ignore parse errors and fall back to marketing_features
+    }
+  }
+
+  if (!features.length && Array.isArray(product.marketing_features)) {
+    features = product.marketing_features
+      .map((f: any) => {
+        if (typeof f === 'string') return f;
+        if (f && typeof f === 'object' && typeof f.name === 'string') return f.name;
+        return '';
+      })
+      .filter((item: string) => item.length > 0);
+  }
 
   return {
     id: product.id,
