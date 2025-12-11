@@ -16,12 +16,58 @@ import { useToast } from '@/components/ui/use-toast';
 import { playNotificationSound } from '@/lib/utils';
 
 const EnhancedNotificationBell = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+
+  const deriveLink = (notification) => {
+    if (notification?.link) return notification.link;
+    const msg = (notification?.message || '').toLowerCase();
+    const isAdmin = profile?.role === 'admin';
+
+    // Try to pull a concrete target id from common fields or payload
+    const getId = () => {
+      const n = notification || {};
+      const direct = n.order_id || n.ticket_id || n.target_id || n.reference_id || n.entity_id;
+      if (typeof direct === 'string' && direct.length >= 8) return direct;
+
+      const tryParse = (val) => {
+        if (!val) return null;
+        try {
+          const obj = typeof val === 'string' ? JSON.parse(val) : val;
+          if (obj && typeof obj === 'object') {
+            return obj.order_id || obj.ticket_id || obj.target_id || null;
+          }
+        } catch {}
+        return null;
+      };
+
+      const fromPayload = tryParse(n.payload) || tryParse(n.metadata) || tryParse(n.details);
+      if (fromPayload) return fromPayload;
+
+      // As a last resort, try to pick an id-like token from the message (#abcdef12)
+      const m = (n.message || '').toString();
+      const match = m.match(/#([A-Za-z0-9_-]{8,})/);
+      if (match) return match[1];
+      return null;
+    };
+
+    const id = getId();
+    const isSupport = msg.includes('ticket') || msg.includes('support') || !!notification?.ticket_id;
+    const isOrder = msg.includes('order') || msg.includes('note') || !!notification?.order_id;
+
+    if (isSupport) {
+      return id ? `/dashboard?tab=support&ticket_id=${encodeURIComponent(id)}` : '/dashboard?tab=support';
+    }
+    if (isOrder) {
+      const base = isAdmin ? '/dashboard?tab=admin-orders' : '/dashboard?tab=orders';
+      return id ? `${base}&order_id=${encodeURIComponent(id)}` : base;
+    }
+    return '/dashboard';
+  };
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -99,10 +145,8 @@ const EnhancedNotificationBell = () => {
       setIsOpen(false);
 
       // 3. Smart Navigation
-      if (notification.link) {
-          // If the link contains params, we might want to navigate cleanly
-          navigate(notification.link);
-      }
+      const target = deriveLink(notification);
+      if (target) navigate(target);
   };
 
   return (
@@ -167,11 +211,9 @@ const EnhancedNotificationBell = () => {
                                         <span className="text-xs text-gray-600">
                                             {new Date(notification.created_at).toLocaleDateString()}
                                         </span>
-                                        {notification.link && (
-                                            <span className="flex items-center text-xs text-cyan-500 hover:text-cyan-400">
-                                                View <ExternalLink className="w-3 h-3 ml-1" />
-                                            </span>
-                                        )}
+                                        <span className="flex items-center text-xs text-cyan-500 hover:text-cyan-400">
+                                            View <ExternalLink className="w-3 h-3 ml-1" />
+                                        </span>
                                     </div>
                                 </div>
                             </div>
