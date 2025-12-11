@@ -177,6 +177,10 @@ const AdminOrderManagement = ({ order, isOpen, onClose, onUpdate }) => {
       order_id: order.id,
       sheet_name: newTracking.name.trim(),
       sheet_url: newTracking.url.trim(),
+      // Some databases enforce tracking_number as NOT NULL, so
+      // we mirror the sheet URL into tracking_number to satisfy
+      // the constraint while still rendering via sheet_url.
+      tracking_number: newTracking.url.trim(),
     });
 
     if (!error) {
