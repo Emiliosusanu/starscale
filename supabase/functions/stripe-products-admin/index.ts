@@ -164,11 +164,8 @@ serve(async (req: Request) => {
         unit_amount !== existingPrice.unit_amount;
 
       if (shouldChangeAmount) {
-        // Stripe does not allow updating unit_amount on an existing price.
-        // Create a new price with the new amount, copy metadata/recurring, and deactivate the old price.
-        await stripe.prices.update(price_id, { active: false });
-
-        await stripe.prices.create({
+        // 1) Create the replacement price
+        const newPrice = await stripe.prices.create({
           product: productId,
           // Use decimal string form to avoid unit_amount parameter issues
           unit_amount_decimal: String(unit_amount),
@@ -177,6 +174,27 @@ serve(async (req: Request) => {
           metadata: newPriceMeta,
           recurring: (existingPrice as any).recurring || undefined,
         });
+
+        // 2) If the old price is the product's default, point default_price to the new one
+        const isDefaultPrice = (currentProduct as any)?.default_price === price_id;
+        if (isDefaultPrice) {
+          try {
+            await stripe.products.update(productId, { default_price: newPrice.id } as any);
+          } catch {
+            // If this fails, we still keep both prices active; storefront uses explicit price IDs.
+          }
+        }
+
+        // 3) Best-effort deactivate the old price, but ignore the
+        // specific error about archiving a default price.
+        try {
+          await stripe.prices.update(price_id, { active: false });
+        } catch (err: any) {
+          const msg = err?.message || err?.raw?.message || '';
+          if (!msg.includes('cannot be archived because it is the default price of its product')) {
+            throw err;
+          }
+        }
       } else {
         // Only metadata / sale price changed
         await stripe.prices.update(price_id, { metadata: newPriceMeta });
