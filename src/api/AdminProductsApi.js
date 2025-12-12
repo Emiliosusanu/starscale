@@ -44,3 +44,40 @@ export async function adminUpdateProduct({
 
   return data?.product || data;
 }
+
+export async function adminCreateProduct({
+  name,
+  description,
+  image,
+  subtitle,
+  ribbonText,
+  features,
+  unitAmountCents,
+  salePriceCents,
+  currency = 'eur',
+  priceNickname = 'Default',
+}) {
+  const { data, error } = await supabase.functions.invoke('stripe-products-admin', {
+    body: {
+      action: 'create_product',
+      payload: {
+        name,
+        description,
+        image,
+        subtitle,
+        ribbon_text: ribbonText,
+        features,
+        unit_amount: unitAmountCents,
+        sale_price_in_cents: salePriceCents,
+        currency,
+        price_nickname: priceNickname,
+      },
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to create product');
+  }
+
+  return data?.product || data;
+}

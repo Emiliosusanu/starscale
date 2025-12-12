@@ -70,7 +70,7 @@ serve(async (req: Request) => {
     const body = await req.json();
     const { action, productId, payload } = body || {};
 
-    if (action !== 'update_product' || !productId || !payload) {
+    if (!action || !payload || (action === 'update_product' && !productId)) {
       return new Response(JSON.stringify({ error: 'Invalid request payload' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -87,7 +87,93 @@ serve(async (req: Request) => {
       unit_amount,
       sale_price_in_cents,
       features,
+      currency,
+      price_nickname,
     } = payload;
+
+    // CREATE PRODUCT FLOW
+    if (action === 'create_product') {
+      if (typeof name !== 'string' || !name.trim()) {
+        return new Response(JSON.stringify({ error: 'Product name is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const cleanedName = name.trim();
+      const cleanedDesc = typeof description === 'string' ? description : '';
+      const curr = (typeof currency === 'string' && currency) ? currency.toLowerCase() : 'eur';
+
+      // Build metadata
+      const newMetadata: Record<string, string> = {};
+      if (typeof subtitle === 'string') newMetadata.subtitle = subtitle;
+      if (typeof ribbon_text === 'string') newMetadata.ribbon_text = ribbon_text;
+
+      let cleanedFeatures: string[] | undefined;
+      if (Array.isArray(features)) {
+        cleanedFeatures = features
+          .map((item: unknown) => (typeof item === 'string' ? item.trim() : ''))
+          .filter((item) => item.length > 0);
+      }
+      if (cleanedFeatures && cleanedFeatures.length) {
+        newMetadata.features_json = JSON.stringify(cleanedFeatures);
+      }
+      newMetadata.category = 'starscale';
+
+      // Create product
+      const productCreate: Record<string, unknown> = {
+        name: cleanedName,
+        description: cleanedDesc,
+        active: true,
+        metadata: newMetadata,
+      };
+
+      if (typeof image === 'string') {
+        const trimmed = image.trim();
+        if (!trimmed) {
+          productCreate.images = [];
+        } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          productCreate.images = [trimmed];
+        }
+      }
+
+      let marketingFeatures: Array<{ name: string }> | undefined;
+      if (cleanedFeatures && cleanedFeatures.length) {
+        marketingFeatures = cleanedFeatures.map((name) => ({ name }));
+      }
+
+      const createdProduct = await stripe.products.create({
+        ...(productCreate as any),
+        ...(marketingFeatures ? { marketing_features: marketingFeatures } : {}),
+      } as any);
+
+      // Create initial price
+      const priceMeta: Record<string, string> = {};
+      if (typeof sale_price_in_cents === 'number' && !Number.isNaN(sale_price_in_cents)) {
+        priceMeta.sale_price = String(sale_price_in_cents);
+      }
+
+      const initialPrice = await stripe.prices.create({
+        product: createdProduct.id,
+        unit_amount_decimal: String(typeof unit_amount === 'number' ? unit_amount : 0),
+        currency: curr,
+        nickname: price_nickname || 'Default',
+        metadata: priceMeta,
+      });
+
+      // Point product default_price to this price (best-effort)
+      try {
+        await stripe.products.update(createdProduct.id, { default_price: initialPrice.id } as any);
+      } catch {}
+
+      const prices = await stripe.prices.list({ product: createdProduct.id, active: true, limit: 100 });
+      const productPayload = transformProduct(createdProduct, prices.data);
+
+      return new Response(JSON.stringify({ product: productPayload }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // 1) Update core product fields
     const productUpdate: Record<string, unknown> = {};

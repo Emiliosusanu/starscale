@@ -258,7 +258,7 @@ const ChatInterface = ({ ticket, onBack, onUpdate }) => {
   );
 };
 
-const SupportTab = ({ onChatOpenChange, onTicketRead }) => {
+const SupportTab = ({ onChatOpenChange, onTicketRead, initialTicketId }) => {
   const [tickets, setTickets] = useState([]);
   const [view, setView] = useState('list'); // list, new, details
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -298,6 +298,16 @@ const SupportTab = ({ onChatOpenChange, onTicketRead }) => {
       
       return () => { supabase.removeChannel(channel); }
   }, [fetchTickets, user.id, selectedTicket]);
+
+  // Open a specific ticket if initialTicketId is provided (from notification deep-link)
+  useEffect(() => {
+    if (!initialTicketId || tickets.length === 0) return;
+    const target = tickets.find((t) => t.id === initialTicketId || t.id?.startsWith?.(initialTicketId));
+    if (target) {
+      openTicket(target);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTicketId, tickets]);
 
   const openTicket = (ticket) => {
       setSelectedTicket(ticket);

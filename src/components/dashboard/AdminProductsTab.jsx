@@ -6,14 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Image as ImageIcon, Edit3, Save, X } from 'lucide-react';
-import { adminListProducts, adminUpdateProduct } from '@/api/AdminProductsApi';
+import { adminListProducts, adminUpdateProduct, adminCreateProduct } from '@/api/AdminProductsApi';
 
 const AdminProductsTab = () => {
   const { toast } = useToast();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState(null); // { isNew?: boolean, ...fields }
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -47,6 +47,27 @@ const AdminProductsTab = () => {
       priceId: primary?.id || null,
       price: primary ? (primary.price_in_cents || 0) / 100 : 0,
       salePrice: primary && primary.sale_price_in_cents != null ? primary.sale_price_in_cents / 100 : '',
+      currency: primary?.currency || 'EUR',
+      priceNickname: 'Default',
+    });
+    setSheetOpen(true);
+  };
+
+  const openCreator = () => {
+    setEditing({
+      isNew: true,
+      id: null,
+      title: '',
+      description: '',
+      image: '',
+      subtitle: '',
+      ribbonText: '',
+      featuresText: '',
+      priceId: null,
+      price: 0,
+      salePrice: '',
+      currency: 'EUR',
+      priceNickname: 'Default',
     });
     setSheetOpen(true);
   };
@@ -57,13 +78,13 @@ const AdminProductsTab = () => {
 
   const handleSave = async () => {
     if (!editing) return;
-    const { id, title, description, image, subtitle, ribbonText, featuresText, priceId, price, salePrice } = editing;
+    const { isNew, id, title, description, image, subtitle, ribbonText, featuresText, priceId, price, salePrice, currency, priceNickname } = editing;
 
     if (!title.trim()) {
       toast({ variant: 'destructive', title: 'Name required', description: 'Product name cannot be empty.' });
       return;
     }
-    if (!priceId) {
+    if (!isNew && !priceId) {
       toast({ variant: 'destructive', title: 'Missing price', description: 'Primary price variant is missing.' });
       return;
     }
@@ -78,21 +99,37 @@ const AdminProductsTab = () => {
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
 
-      const updated = await adminUpdateProduct({
-        productId: id,
-        name: title,
-        description,
-        image,
-        subtitle,
-        ribbonText,
-        features,
-        priceId,
-        unitAmountCents,
-        salePriceCents,
-      });
-
-      setProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
-      toast({ title: 'Product updated', description: 'Storefront will reflect these changes shortly.' });
+      if (isNew) {
+        const created = await adminCreateProduct({
+          name: title,
+          description,
+          image,
+          subtitle,
+          ribbonText,
+          features,
+          unitAmountCents,
+          salePriceCents,
+          currency: (currency || 'EUR').toLowerCase(),
+          priceNickname: priceNickname || 'Default',
+        });
+        setProducts((prev) => [created, ...prev]);
+        toast({ title: 'Product created', description: 'New product added to the store.' });
+      } else {
+        const updated = await adminUpdateProduct({
+          productId: id,
+          name: title,
+          description,
+          image,
+          subtitle,
+          ribbonText,
+          features,
+          priceId,
+          unitAmountCents,
+          salePriceCents,
+        });
+        setProducts((prev) => prev.map((p) => (p.id === id ? updated : p)));
+        toast({ title: 'Product updated', description: 'Storefront will reflect these changes shortly.' });
+      }
       setSheetOpen(false);
       setEditing(null);
     } catch (e) {
@@ -115,6 +152,9 @@ const AdminProductsTab = () => {
           <h2 className="text-2xl font-bold text-white">Products</h2>
           <p className="text-sm text-gray-400">Edit product name, imagery, details and pricing used in the store.</p>
         </div>
+        <Button onClick={openCreator} className="bg-cyan-600 hover:bg-cyan-500 text-sm font-semibold px-4">
+          + Add Product
+        </Button>
       </div>
 
       <div className="overflow-x-auto">
@@ -265,6 +305,31 @@ const AdminProductsTab = () => {
                   />
                 </div>
               </div>
+
+              {editing?.isNew && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Currency</label>
+                    <select
+                      value={editing.currency}
+                      onChange={(e) => handleFieldChange('currency', e.target.value)}
+                      className="w-full h-10 rounded-md bg-black/40 border border-white/10 px-3 text-sm"
+                    >
+                      <option>EUR</option>
+                      <option>USD</option>
+                      <option>GBP</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Price Nickname</label>
+                    <Input
+                      value={editing.priceNickname}
+                      onChange={(e) => handleFieldChange('priceNickname', e.target.value)}
+                      className="bg-black/40 border-white/10 text-sm"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-xs text-gray-400">Ribbon Text</label>
